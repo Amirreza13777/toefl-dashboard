@@ -1,6 +1,6 @@
 {
   "name": "TOEFL 6-Month Study Dashboard",
-  "short_name": "TOEFL Hub",
+  "short_name": "TOEFL Tracker",
   "description": "Gamified 6-month TOEFL study tracker and daily routine dashboard",
   "start_url": "/toefl-dashboard/",
   "scope": "/toefl-dashboard/",
