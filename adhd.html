@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOEFL Quest | داشبورد هوشمند و بازی‌وار تافل</title>
+    <!-- فونت وزیرمتن برای خوانایی بی‌نقص فارسی -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <!-- کتابخانه Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- کتابخانه افکت جشن و کاغذ رنگی بدون صدا (Canvas Confetti) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- آیکون‌های Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'sans-serif'],
+                    },
+                    colors: {
+                        darkbg: '#0B0F19',
+                        cardbg: '#131A2B',
+                        cardhover: '#1A233A',
+                        neonviolet: '#8B5CF6',
+                        neonemerald: '#10B981',
+                        neonamber: '#F59E0B',
+                        neoncyan: '#06B6D4'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0B0F19;
+            color: #F3F4F6;
+            font-family: 'Vazirmatn', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* اسکرول‌بار سفارشی و مینیمال */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0F19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1E293B;
+            border-radius: 999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+
+        /* انیمیشن تیک خوردن رضایت‌بخش */
+        @keyframes popCheck {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: popCheck 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* افکت درخشش ملایم نئونی */
+        .glow-violet {
+            box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.25);
+        }
+        
+        /* انیمیشن شناور برای امتیاز کسب شده */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.2); }
+        }
+        .xp-toast {
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-16 selection:bg-neonviolet selection:text-white">
+
+    <!-- کانتینر نمایش امتیازهای شناور (دوپامین لحظه‌ای) -->
+    <div id="floating-xp-container" class="fixed inset-0 pointer-events-none z-50"></div>
+
+    <!-- هدر و نوار وضعیت بازی‌وارسازی (Gamification Bar) -->
+    <header class="sticky top-0 z-40 backdrop-blur-xl bg-darkbg/85 border-b border-slate-800/80">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <!-- لوگو و عنوان -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-neonviolet to-neoncyan flex items-center justify-center shadow-lg shadow-neonviolet/20">
+                    <i data-lucide="zap" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white flex items-center gap-2">
+                        TOEFL Quest
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neonviolet/20 text-purple-300 border border-neonviolet/30">مسیر ۶ ماهه</span>
+                    </h1>
+                    <p id="persian-date" class="text-xs text-slate-400">در حال بارگذاری تاریخ...</p>
+                </div>
+            </div>
+
+            <!-- آمارهای دوپامینی: استریک، لول و نوار XP -->
+            <div class="flex items-center gap-3 sm:gap-5 flex-1 sm:flex-initial justify-end">
+                <!-- استریک روزانه -->
+                <div class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-2xl" title="روزهای متوالی پایبندی">
+                    <span class="text-lg">🔥</span>
+                    <div>
+                        <div class="text-xs font-bold text-amber-400"><span id="streak-count">0</span> روز</div>
+                        <div class="text-[10px] text-slate-500">زنجیره فعال</div>
+                    </div>
+                </div>
+
+                <!-- لول و نوار پیشرفت XP -->
+                <div class="bg-slate-900/90 border border-slate-800 px-3.5 py-1.5 rounded-2xl min-w-[150px] sm:min-w-[190px]">
+                    <div class="flex justify-between items-center text-xs mb-1">
+                        <span class="font-bold text-purple-300">سطح <span id="user-level">1</span></span>
+                        <span class="text-[11px] text-slate-400"><span id="current-xp">0</span> / <span id="next-level-xp">500</span> XP</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="xp-bar" class="h-full bg-gradient-to-l from-neonviolet via-purple-400 to-neoncyan rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- محتوای اصلی داشبورد -->
+    <main class="max-w-5xl mx-auto px-4 pt-6 space-y-6">
+
+        <!-- بخش ۱: کارت قهرمان «تمرکز الان» + تایمر پومودورو (ضد شلوغی ذهنی) -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            
+            <!-- کارت تمرکز الان (Right Now Focus Card) -->
+            <div class="lg:col-span-7 bg-gradient-to-br from-cardbg to-[#161E35] border border-neonviolet/30 rounded-3xl p-6 glow-violet relative overflow-hidden flex flex-col justify-between">
+                <div class="absolute -left-10 -top-10 w-40 h-40 bg-neonviolet/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div>
+                    <div class="flex items-center justify-between gap-2 mb-4">
+                        <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-neonviolet/20 text-purple-300 border border-neonviolet/30">
+                            <span class="w-2 h-2 rounded-full bg-neonviolet animate-pulse"></span>
+                            ماموریت الانِ تو
+                        </span>
+                        
+                        <!-- سوییچ حالت جمعه (فوتسال و استراحت) -->
+                        <label class="inline-flex items-center gap-2 cursor-pointer bg-slate-900/80 px-3 py-1.5 rounded-2xl border border-slate-800 hover:border-slate-700 transition">
+                            <input type="checkbox" id="friday-toggle" class="sr-only peer">
+                            <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all relative peer-checked:bg-neonemerald"></div>
+                            <span class="text-xs font-medium text-slate-300 select-none">حالت جمعه ⚽</span>
+                        </label>
+                    </div>
+
+                    <div id="focus-card-content" class="space-y-2">
+                        <div class="flex items-center gap-2 text-xs text-neoncyan font-medium">
+                            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                            <span id="focus-time-badge">09:00 – 09:45</span>
+                            <span>•</span>
+                            <span id="focus-location-badge">📚 کتابخانه</span>
+                        </div>
+                        <h2 id="focus-task-title" class="text-xl sm:text-2xl font-extrabold text-white leading-snug">
+                            مرور Anki و کالوکیشن‌ها
+                        </h2>
+                        <p id="focus-task-desc" class="text-sm text-slate-400 leading-relaxed">
+                            مغزت رو با مرور کارت‌های دیشب و کالوکیشن‌های جدید گرم کن.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span id="focus-xp-badge" class="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                            +50 XP
+                        </span>
+                        <span class="text-xs text-slate-400">پیشرفت امروز: <strong id="today-percent" class="text-white">0%</strong></span>
+                    </div>
+
+                    <button id="complete-focus-btn" onclick="completeCurrentFocusTask()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neonviolet hover:bg-purple-500 active:scale-95 text-white font-bold text-sm transition shadow-lg shadow-neonviolet/25 cursor-pointer">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        <span>انجام شد! بگیر XP رو</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- کارت تایمر تمرکز (ADHD Focus Timer) -->
+            <div class="lg:col-span-5 bg-cardbg border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="timer" class="w-4 h-4 text-neoncyan"></i>
+                        <h3 class="font-bold text-sm text-slate-200">تایمر تمرکز عمیق</h3>
+                    </div>
+                    <!-- دکمه‌های انتخاب سریع زمان -->
+                    <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                        <button onclick="setTimerMinutes(25)" class="timer-preset px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 text-white transition cursor-pointer" data-min="25">۲۵د</button>
+                        <button onclick="setTimerMinutes(45)" class="timer-preset px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer" data-min="45">۴۵د</button>
+                        <button onclick="setTimerMinutes(90)" class="timer-preset px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer" data-min="90">۹۰د</button>
+                    </div>
+                </div>
+
+                <!-- نمایشگر دیجیتال تایمر -->
+                <div class="my-4 text-center py-4 rounded-2xl bg-darkbg/70 border border-slate-800/80 relative">
+                    <div id="timer-display" class="text-4xl sm:text-5xl font-black tracking-wider text-white tabular-nums">
+                        25:00
+                    </div>
+                    <p id="timer-status-text" class="text-xs text-slate-500 mt-1">آماده شروع یک راند تمرکز بدون حواس‌پرتی</p>
+                </div>
+
+                <!-- دکمه‌های کنترل تایمر -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="timer-start-btn" onclick="toggleTimer()" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-neonemerald/20 hover:bg-neonemerald/30 text-emerald-300 border border-neonemerald/30 font-bold text-sm transition active:scale-95 cursor-pointer">
+                        <i data-lucide="play" class="w-4 h-4"></i>
+                        <span id="timer-btn-label">شروع تمرکز</span>
+                    </button>
+                    <button onclick="resetTimer()" class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-medium text-sm transition active:scale-95 cursor-pointer">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <span>ریست</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- بخش ۲: برنامه روزانه (کارت‌های تعاملی و تمیز) -->
+        <section class="bg-cardbg border border-slate-800/90 rounded-3xl p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-lg font-extrabold text-white flex items-center gap-2">
+                        <i data-lucide="list-checks" class="w-5 h-5 text-neonemerald"></i>
+                        <span id="routine-section-title">چک‌لیست ماموریت‌های امروز</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">روی هر کارت کلیک کن تا تیک بخوره و XP بگیری</p>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <span id="completed-tasks-badge" class="text-xs font-bold px-3 py-1.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300">
+                        0 از 8 انجام شده
+                    </span>
+                    <button onclick="resetTodayTasks()" class="text-xs px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-800 transition cursor-pointer" title="شروع روز جدید (پاک کردن تیک‌های امروز)">
+                        روز جدید 🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- گرید کارت‌های برنامه روزانه -->
+            <div id="daily-tasks-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <!-- کارت‌ها به صورت پویا توسط جاوااسکریپت ساخته می‌شوند -->
+            </div>
+        </section>
+
+        <!-- بخش ۳: منوی تسک‌های زمان آزاد (Side Quests / Bonus XP) -->
+        <section class="bg-cardbg border border-slate-800/90 rounded-3xl p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div>
+                    <h2 class="text-lg font-extrabold text-white flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-neonamber"></i>
+                        تسک‌های زمان آزاد (Side Quests)
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">بدون اجبار زمانی! هر وقت انرژی اضافه داشتی یکی رو شکار کن و امتیاز اضافه بگیر</p>
+                </div>
+                <span class="text-xs px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium">
+                    امتیاز تشویقی نامحدود
+                </span>
+            </div>
+
+            <div id="side-quests-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <!-- کارت‌های زمان آزاد به صورت پویا ساخته می‌شوند -->
+            </div>
+        </section>
+
+        <!-- بخش ۴: نقشه بصری مسیر ۶ ماهه (۱۸۰ روز - سبک گیت‌هاب و مراحل بازی) -->
+        <section class="bg-cardbg border border-slate-800/90 rounded-3xl p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-lg font-extrabold text-white flex items-center gap-2">
+                        <i data-lucide="map" class="w-5 h-5 text-neoncyan"></i>
+                        نقشه سفر ۶ ماهه (۱۸۰ روز تا تافل)
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5">هر روزی که حداقل ۷۰٪ برنامه رو انجام بدی، یک خانه سبز در نقشه روشن می‌شه</p>
+                </div>
+                <div class="text-xs font-bold text-neoncyan bg-cyan-950/50 border border-cyan-800/50 px-3 py-1.5 rounded-2xl">
+                    روز <span id="journey-day-num">1</span> از 180
+                </div>
+            </div>
+
+            <!-- ۳ فاز اصلی ۶ ماهه -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                <div id="phase-1-card" class="p-3.5 rounded-2xl bg-slate-900/90 border border-neonviolet/40">
+                    <div class="flex justify-between items-center text-xs font-bold text-purple-300 mb-1">
+                        <span>فاز ۱: ماه ۱ و ۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-neonviolet/20 text-[10px]">فعال</span>
+                    </div>
+                    <p class="text-xs text-slate-300 font-medium">تثبیت پایه و ابزارها</p>
+                    <p class="text-[11px] text-slate-500 mt-1">تسلط بر بانک ایده ۸ محوره و قالب‌های ساده رایتینگ با نگاه به جزوه</p>
+                </div>
+
+                <div id="phase-2-card" class="p-3.5 rounded-2xl bg-slate-900/50 border border-slate-800">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-400 mb-1">
+                        <span>فاز ۲: ماه ۳ و ۴</span>
+                        <span class="text-[10px] text-slate-500">روز ۶۱ تا ۱۲۰</span>
+                    </div>
+                    <p class="text-xs text-slate-300 font-medium">تمرین بدون تقلب‌نامه و زمان‌دار</p>
+                    <p class="text-[11px] text-slate-500 mt-1">ایمیل در ۷ دقیقه، Discussion در ۱۰ دقیقه و اسپیکینگ ۴۵ ثانیه‌ای</p>
+                </div>
+
+                <div id="phase-3-card" class="p-3.5 rounded-2xl bg-slate-900/50 border border-slate-800">
+                    <div class="flex justify-between items-center text-xs font-bold text-slate-400 mb-1">
+                        <span>فاز ۳: ماه ۵ و ۶</span>
+                        <span class="text-[10px] text-slate-500">روز ۱۲۱ تا ۱۸۰</span>
+                    </div>
+                    <p class="text-xs text-slate-300 font-medium">شبیه‌سازی کامل و صفر کردن خطا</p>
+                    <p class="text-[11px] text-slate-500 mt-1">آزمون‌های جامع (Mock Tests) و اجرای پروتکل حذف بی‌دقتی‌ها</p>
+                </div>
+            </div>
+
+            <!-- هیت‌مپ ۱۸۰ روزه (مربع‌های پیشرفت) -->
+            <div class="bg-darkbg/80 p-4 rounded-2xl border border-slate-800/80">
+                <div id="heatmap-grid" class="grid grid-cols-15 sm:grid-cols-30 gap-1.5" style="grid-template-columns: repeat(auto-fill, minmax(14px, 1fr));">
+                    <!-- ۱۸۰ مربع پیشرفت اینجا ساخته می‌شوند -->
+                </div>
+                <div class="flex items-center justify-between mt-3 text-[11px] text-slate-500">
+                    <span>شروع مسیر (روز ۱)</span>
+                    <div class="flex items-center gap-1.5">
+                        <span>کمتر</span>
+                        <span class="w-3 h-3 rounded-sm bg-slate-800 inline-block"></span>
+                        <span class="w-3 h-3 rounded-sm bg-emerald-900 inline-block"></span>
+                        <span class="w-3 h-3 rounded-sm bg-emerald-600 inline-block"></span>
+                        <span class="w-3 h-3 rounded-sm bg-neonemerald inline-block"></span>
+                        <span>کامل</span>
+                    </div>
+                    <span>روز آزمون (روز ۱۸۰)</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- پنجره پیام سفارشی (جایگزین alert) -->
+    <div id="toast-message" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white text-sm font-medium shadow-2xl opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2">
+        <span id="toast-icon">🎉</span>
+        <span id="toast-text">پیام سیستم</span>
+    </div>
+
+    <script>
+        // --- داده‌های برنامه روزانه (شنبه تا پنج‌شنبه) ---
+        const REGULAR_TASKS = [
+            {
+                id: 't1',
+                time: '09:00 – 09:45',
+                startHour: 9, endHour: 9.75,
+                location: '📚 کتابخانه',
+                title: 'مرور Anki و کالوکیشن‌ها',
+                desc: 'مرور فلش‌کارت‌های Reading و کالوکیشن‌های بانک ایده بدون عجله.',
+                xp: 50,
+                tag: 'واژگان'
+            },
+            {
+                id: 't2',
+                time: '09:45 – 11:15',
+                startHour: 9.75, endHour: 11.25,
+                location: '📚 کتابخانه',
+                title: 'تمرین اصلی Writing با قالب‌های ساده',
+                desc: 'تایپ یک Email (۷ دقیقه) یا Academic Discussion (۱۰ دقیقه) با کمک بانک ایده ۸ محوره.',
+                xp: 100,
+                tag: 'اولویت اول'
+            },
+            {
+                id: 't3',
+                time: '11:15 – 11:30',
+                startHour: 11.25, endHour: 11.5,
+                location: '☕ استراحت',
+                title: 'استراحت کوتاه و شارژ مجدد',
+                desc: 'بلند شو، آب بخور و به چشم‌ها و مغزت ۱۵ دقیقه استراحت بده.',
+                xp: 20,
+                tag: 'ریکاوری'
+            },
+            {
+                id: 't4',
+                time: '11:30 – 13:00',
+                startHour: 11.5, endHour: 13,
+                location: '📚 کتابخانه',
+                title: 'درک مطلب Reading و گرامر Build a Sentence',
+                desc: 'تمرین C-Test (جای خالی) و جمله‌سازی با تمرکز روی تشخیص نقش دستوری.',
+                xp: 100,
+                tag: 'مهارت پایه'
+            },
+            {
+                id: 't5',
+                time: '13:00 – 14:00',
+                startHour: 13, endHour: 14,
+                location: '📚 کتابخانه',
+                title: 'مرور و تحلیل خطاهای روزانه در Obsidian',
+                desc: 'ثبت اشتباهات امروز در جدول پروتکل خطایابی تا دیگه تکرار نشن.',
+                xp: 60,
+                tag: 'عیب‌یابی'
+            },
+            {
+                id: 't6',
+                time: '14:00 – 17:30',
+                startHour: 14, endHour: 17.5,
+                location: '🏠 خانه',
+                title: 'ناهار، خواب و ریکاوری کامل',
+                desc: 'استراحت واقعی و بدون عذاب وجدان برای شارژ انرژی عصر.',
+                xp: 30,
+                tag: 'استراحت'
+            },
+            {
+                id: 't7',
+                time: '17:30 – 18:30',
+                startHour: 17.5, endHour: 18.5,
+                location: '🏠 خانه',
+                title: 'تمرین Speaking با صدای بلند',
+                desc: 'پاسخ ۴۵ ثانیه‌ای با تقلب‌نامه اسپیکینگ و ضبط صدا با گوشی.',
+                xp: 80,
+                tag: 'مکالمه'
+            },
+            {
+                id: 't8',
+                time: '18:30 به بعد',
+                startHour: 18.5, endHour: 24,
+                location: '🚶‍♂️ بیرون / خانه',
+                title: 'پیاده‌روی، مطالعه آزاد یا پادکست',
+                desc: 'گوش دادن به پادکست انگلیسی در حین پیاده‌روی عصرگاهی.',
+                xp: 40,
+                tag: 'سبک و آزاد'
+            }
+        ];
+
+        // --- داده‌های حالت جمعه (استراحت و فوتبال) ---
+        const FRIDAY_TASKS = [
+            {
+                id: 'f1',
+                time: 'صبح (۳۰ دقیقه)',
+                startHour: 9, endHour: 12,
+                location: '🏠 خانه',
+                title: 'مرور خیلی سبک Anki',
+                desc: 'فقط کارت‌های قرمز و مرورهای واجب امروز رو بزن تا زنجیره حفظ بشه.',
+                xp: 60,
+                tag: 'حفظ زنجیره'
+            },
+            {
+                id: 'f2',
+                time: 'ظهر تا عصر',
+                startHour: 12, endHour: 18,
+                location: '⚽ سالن فوتبال',
+                title: 'فوتبال، هیجان و تخلیه انرژی!',
+                desc: 'امروز روز استراحت مغزه؛ از فوتبال و جمع دوستان لذت ببر.',
+                xp: 100,
+                tag: 'فوتبال تایم'
+            },
+            {
+                id: 'f3',
+                time: 'شب',
+                startHour: 18, endHour: 24,
+                location: '🏠 خانه',
+                title: 'استراحت کامل و آماده شدن برای هفته جدید',
+                desc: 'یک نگاه کوتاه به داشبورد Obsidian برای فردا صبح.',
+                xp: 40,
+                tag: 'ریکاوری'
+            }
+        ];
+
+        // --- تسک‌های زمان آزاد (Side Quests) ---
+        const SIDE_QUESTS = [
+            { id: 'sq1', icon: '🎧', title: 'مینی‌تست Listening', desc: 'حل ۱ بخش کوتاه لیسنینگ و نوت‌برداری سریع', xp: 40 },
+            { id: 'sq2', icon: '🎤', title: 'تست تکرار Listen & Repeat', desc: 'تکرار ۷ جمله کوتاه دانشگاهی برای تقویت حافظه شنیداری', xp: 30 },
+            { id: 'sq3', icon: '📖', title: '۱۵ دقیقه ریشه‌شناسی', desc: 'مرور ۳ تا ۵ پیشوند و پسوند پرتکرار از جدول ریشه‌ها', xp: 30 },
+            { id: 'sq4', icon: '✍️', title: 'بازنویسی سریع Paraphrase', desc: 'تغییر دادن کلمات یک پاراگراف نمونه با مترادف‌های ساده', xp: 35 },
+            { id: 'sq5', icon: '🧠', title: 'مرور سریع Anki در وقت مرده', desc: 'زدن ۱۰ کارت باقی‌مانده در گوشی', xp: 25 }
+        ];
+
+        // --- مدیریت وضعیت و ذخیره‌سازی در مرورگر (LocalStorage) ---
+        let state = {
+            xp: 0,
+            streak: 1,
+            isFridayMode: false,
+            completedTasks: [],
+            sideQuestsCompletedCount: {},
+            completedDaysCount: 1,
+            historyHeatmap: {} // ذخیره وضعیت ۱۸۰ روز
+        };
+
+        function loadState() {
+            const saved = localStorage.getItem('toefl_adhd_quest_v1');
+            if (saved) {
+                try {
+                    state = { ...state, ...JSON.parse(saved) };
+                } catch (e) {
+                    console.error('Error loading state', e);
+                }
+            } else {
+                // تشخیص خودکار روز جمعه در بار اول
+                const today = new Date().getDay(); // 5 = Friday
+                if (today === 5) state.isFridayMode = true;
+            }
+        }
+
+        function saveState() {
+            localStorage.setItem('toefl_adhd_quest_v1', JSON.stringify(state));
+        }
+
+        // --- نمایش تاریخ شمسی ---
+        function renderPersianDate() {
+            try {
+                const now = new Date();
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const persianDate = new Intl.DateTimeFormat('fa-IR', options).format(now);
+                document.getElementById('persian-date').textContent = persianDate;
+            } catch (e) {
+                document.getElementById('persian-date').textContent = 'برنامه روزانه تافل';
+            }
+        }
+
+        // --- نمایش پیام Toast سفارشی ---
+        let toastTimeout;
+        function showToast(text, icon = '✨') {
+            const toast = document.getElementById('toast-message');
+            document.getElementById('toast-text').textContent = text;
+            document.getElementById('toast-icon').textContent = icon;
+            toast.classList.remove('opacity-0', 'translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                toast.classList.remove('opacity-100', 'translate-y-0');
+            }, 3000);
+        }
+
+        // --- افکت شناور شدن امتیاز (Floating XP) ---
+        function spawnFloatingXP(amount, x, y) {
+            const container = document.getElementById('floating-xp-container');
+            const el = document.createElement('div');
+            el.className = 'xp-toast fixed font-black text-lg text-amber-400 drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)] z-50';
+            el.style.left = (x || window.innerWidth / 2) + 'px';
+            el.style.top = (y || window.innerHeight / 2) + 'px';
+            el.textContent = `+${amount} XP!`;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // --- افزودن XP و بررسی ارتقای سطح (Level Up) ---
+        function addXP(amount, event) {
+            const oldLevel = Math.floor(state.xp / 500) + 1;
+            state.xp = Math.max(0, state.xp + amount);
+            const newLevel = Math.floor(state.xp / 500) + 1;
+
+            if (amount > 0) {
+                const x = event ? event.clientX : window.innerWidth / 2;
+                const y = event ? event.clientY : window.innerHeight / 3;
+                spawnFloatingXP(amount, x, y);
+
+                if (newLevel > oldLevel) {
+                    confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+                    showToast(`تبریک! به سطح ${newLevel} ارتقا پیدا کردی! 🚀`, '🏆');
+                }
+            }
+            saveState();
+            updateHeaderStats();
+        }
+
+        function updateHeaderStats() {
+            const level = Math.floor(state.xp / 500) + 1;
+            const xpInCurrentLevel = state.xp % 500;
+            const percent = (xpInCurrentLevel / 500) * 100;
+
+            document.getElementById('user-level').textContent = level;
+            document.getElementById('current-xp').textContent = xpInCurrentLevel;
+            document.getElementById('next-level-xp').textContent = 500;
+            document.getElementById('xp-bar').style.width = `${percent}%`;
+            document.getElementById('streak-count').textContent = state.streak;
+        }
+
+        // --- رندر کردن برنامه روزانه و کارت «تمرکز الان» ---
+        function getActiveTaskList() {
+            return state.isFridayMode ? FRIDAY_TASKS : REGULAR_TASKS;
+        }
+
+        function renderDashboard() {
+            const tasks = getActiveTaskList();
+            const grid = document.getElementById('daily-tasks-grid');
+            grid.innerHTML = '';
+
+            let completedCount = 0;
+
+            tasks.forEach(task => {
+                const isDone = state.completedTasks.includes(task.id);
+                if (isDone) completedCount++;
+
+                const card = document.createElement('div');
+                card.onclick = (e) => toggleTask(task.id, task.xp, e);
+                card.className = `group p-4 rounded-2xl border transition-all duration-200 cursor-pointer select-none flex items-start gap-3.5 ${
+                    isDone 
+                    ? 'bg-emerald-950/25 border-neonemerald/40 opacity-85' 
+                    : 'bg-slate-900/80 hover:bg-cardhover border-slate-800 hover:border-slate-700'
+                }`;
+
+                card.innerHTML = `
+                    <div class="mt-0.5 w-6 h-6 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                        isDone 
+                        ? 'bg-neonemerald border-neonemerald text-darkbg animate-pop' 
+                        : 'border-slate-600 group-hover:border-neonviolet bg-darkbg'
+                    }">
+                        ${isDone ? '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>' : ''}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                            <span class="text-[11px] font-semibold text-neoncyan">${task.time} • ${task.location}</span>
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+                                isDone ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-amber-400'
+                            }">+${task.xp} XP</span>
+                        </div>
+                        <h4 class="font-bold text-sm sm:text-base transition ${isDone ? 'line-through text-slate-400' : 'text-white'}">
+                            ${task.title}
+                        </h4>
+                        <p class="text-xs text-slate-400 mt-1 leading-relaxed">${task.desc}</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            // آپدیت آمار امروز
+            const total = tasks.length;
+            const percent = Math.round((completedCount / total) * 100);
+            document.getElementById('completed-tasks-badge').textContent = `${completedCount} از ${total} انجام شده`;
+            document.getElementById('today-percent').textContent = `${percent}%`;
+            document.getElementById('routine-section-title').textContent = state.isFridayMode 
+                ? 'برنامه سبک جمعه (استراحت و فوتبال ⚽)' 
+                : 'چک‌لیست ماموریت‌های امروز';
+
+            // ذخیره پیشرفت روز جاری در هیت‌مپ
+            state.historyHeatmap[state.completedDaysCount] = percent;
+            saveState();
+
+            updateFocusCard(tasks);
+            renderHeatmap();
+            lucide.createIcons();
+        }
+
+        // --- انتخاب هوشمند ماموریت فعلی برای کارت «تمرکز الان» ---
+        let currentFocusTaskId = null;
+
+        function updateFocusCard(tasks) {
+            const now = new Date();
+            const currentHour = now.getHours() + now.getMinutes() / 60;
+
+            // اولویت با اولین تسک انجام‌نشده که زمانش رسیده یا پیش رو است
+            let focusTask = tasks.find(t => !state.completedTasks.includes(t.id) && currentHour <= t.endHour);
+            // اگر نوبت زمانی گذشته بود، اولین تسک انجام‌نشده روز را نشان بده
+            if (!focusTask) {
+                focusTask = tasks.find(t => !state.completedTasks.includes(t.id));
+            }
+
+            const btn = document.getElementById('complete-focus-btn');
+
+            if (focusTask) {
+                currentFocusTaskId = focusTask.id;
+                document.getElementById('focus-time-badge').textContent = focusTask.time;
+                document.getElementById('focus-location-badge').textContent = focusTask.location;
+                document.getElementById('focus-task-title').textContent = focusTask.title;
+                document.getElementById('focus-task-desc').textContent = focusTask.desc;
+                document.getElementById('focus-xp-badge').textContent = `+${focusTask.xp} XP`;
+                
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-neonemerald');
+                btn.classList.add('bg-neonviolet');
+                btn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i><span>انجام شد! بگیر XP رو</span>`;
+            } else {
+                currentFocusTaskId = null;
+                document.getElementById('focus-time-badge').textContent = 'ماموریت کامل شد';
+                document.getElementById('focus-location-badge').textContent = '🎉 قهرمان امروز';
+                document.getElementById('focus-task-title').textContent = 'تمام کارهای امروزت رو با موفقیت انجام دادی!';
+                document.getElementById('focus-task-desc').textContent = 'مغزت الان حق داره استراحت کنه. اگر هنوز انرژی داری می‌تونی از بخش تسک‌های زمان آزاد امتیاز اضافه بگیری.';
+                document.getElementById('focus-xp-badge').textContent = '100% تکمیل';
+                
+                btn.disabled = true;
+                btn.classList.remove('bg-neonviolet');
+                btn.classList.add('bg-neonemerald', 'opacity-80', 'cursor-default');
+                btn.innerHTML = `<i data-lucide="award" class="w-4 h-4"></i><span>روز عالی ثبت شد</span>`;
+            }
+        }
+
+        function completeCurrentFocusTask(event) {
+            if (!currentFocusTaskId) return;
+            const tasks = getActiveTaskList();
+            const task = tasks.find(t => t.id === currentFocusTaskId);
+            if (task && !state.completedTasks.includes(task.id)) {
+                toggleTask(task.id, task.xp, event);
+            }
+        }
+
+        function toggleTask(taskId, xp, event) {
+            const idx = state.completedTasks.indexOf(taskId);
+            if (idx === -1) {
+                state.completedTasks.push(taskId);
+                addXP(xp, event);
+
+                // اگر کل تسک‌های امروز تمام شد، جشن بگیر!
+                const tasks = getActiveTaskList();
+                if (state.completedTasks.length === tasks.length) {
+                    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                    showToast('فوق‌العاده بود! کل برنامه امروز رو ۱۰۰٪ تموم کردی! 🔥', '🎉');
+                }
+            } else {
+                state.completedTasks.splice(idx, 1);
+                addXP(-xp);
+            }
+            saveState();
+            renderDashboard();
+        }
+
+        // --- رندر کردن تسک‌های زمان آزاد (Side Quests) ---
+        function renderSideQuests() {
+            const grid = document.getElementById('side-quests-grid');
+            grid.innerHTML = '';
+
+            SIDE_QUESTS.forEach(sq => {
+                const count = state.sideQuestsCompletedCount[sq.id] || 0;
+                const card = document.createElement('div');
+                card.onclick = (e) => triggerSideQuest(sq, e);
+                card.className = 'p-4 rounded-2xl bg-slate-900/70 hover:bg-cardhover border border-slate-800 hover:border-amber-500/40 transition cursor-pointer select-none flex flex-col justify-between group active:scale-[0.98]';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-2xl">${sq.icon}</span>
+                            <div class="flex items-center gap-1.5">
+                                ${count > 0 ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">${count}× انجام شده</span>` : ''}
+                                <span class="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-amber-500/15 text-amber-400">+${sq.xp} XP</span>
+                            </div>
+                        </div>
+                        <h4 class="font-bold text-sm text-white group-hover:text-amber-300 transition">${sq.title}</h4>
+                        <p class="text-xs text-slate-400 mt-1 leading-relaxed">${sq.desc}</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 group-hover:text-white">
+                        <span>کلیک برای ثبت انجام</span>
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-amber-400"></i>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        function triggerSideQuest(sq, event) {
+            state.sideQuestsCompletedCount[sq.id] = (state.sideQuestsCompletedCount[sq.id] || 0) + 1;
+            addXP(sq.xp, event);
+            confetti({ particleCount: 35, spread: 50, origin: { y: 0.7 } });
+            showToast(`ایول! امتیاز تشویقی «${sq.title}» ثبت شد!`, sq.icon);
+            renderSideQuests();
+        }
+
+        // --- رندر نقشه ۱۸۰ روزه (Heatmap) ---
+        function renderHeatmap() {
+            const container = document.getElementById('heatmap-grid');
+            container.innerHTML = '';
+            document.getElementById('journey-day-num').textContent = state.completedDaysCount;
+
+            for (let day = 1; day <= 180; day++) {
+                const pct = state.historyHeatmap[day] || 0;
+                const cell = document.createElement('div');
+                
+                let colorClass = 'bg-slate-800/80';
+                if (pct >= 90) colorClass = 'bg-neonemerald shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+                else if (pct >= 50) colorClass = 'bg-emerald-600';
+                else if (pct > 0) colorClass = 'bg-emerald-900';
+
+                const isCurrent = day === state.completedDaysCount;
+                cell.className = `h-3.5 rounded-[4px] transition-all ${colorClass} ${isCurrent ? 'ring-2 ring-neonviolet scale-110' : ''}`;
+                cell.title = `روز ${day} از ۱۸۰ (${pct}% تکمیل)`;
+                container.appendChild(cell);
+            }
+        }
+
+        // --- شروع روز جدید (انتقال به روز بعد در مسیر ۱۸۰ روزه) ---
+        function resetTodayTasks() {
+            if (state.completedTasks.length > 0) {
+                state.streak += 1;
+                state.completedDaysCount = Math.min(180, state.completedDaysCount + 1);
+            }
+            state.completedTasks = [];
+            saveState();
+            renderDashboard();
+            updateHeaderStats();
+            showToast(`روز ${state.completedDaysCount} از سفر ۶ ماهه شروع شد! پرانرژی برو جلو 💪`, '🌅');
+        }
+
+        // --- منطق تایمر تمرکز (Pomodoro / Focus Timer) ---
+        let timerSeconds = 25 * 60;
+        let selectedPresetMinutes = 25;
+        let timerInterval = null;
+        let isTimerRunning = false;
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function setTimerMinutes(mins) {
+            if (isTimerRunning) toggleTimer();
+            selectedPresetMinutes = mins;
+            timerSeconds = mins * 60;
+            document.getElementById('timer-display').textContent = formatTime(timerSeconds);
+            document.getElementById('timer-status-text').textContent = `تایمر روی ${mins} دقیقه تنظیم شد`;
+
+            document.querySelectorAll('.timer-preset').forEach(btn => {
+                if (parseInt(btn.dataset.min) === mins) {
+                    btn.classList.add('bg-slate-800', 'text-white');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-slate-800', 'text-white');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+        }
+
+        function toggleTimer() {
+            const btn = document.getElementById('timer-start-btn');
+            const label = document.getElementById('timer-btn-label');
+            const statusText = document.getElementById('timer-status-text');
+
+            if (isTimerRunning) {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                label.textContent = 'ادامه تمرکز';
+                statusText.textContent = 'تایمر متوقف شد (نفس عمیق بکش)';
+                btn.classList.replace('bg-amber-500/20', 'bg-neonemerald/20');
+                btn.classList.replace('text-amber-300', 'text-emerald-300');
+            } else {
+                isTimerRunning = true;
+                label.textContent = 'توقف موقت';
+                statusText.textContent = 'در حال تمرکز عمیق... گوشی رو بذار کنار 🎯';
+                btn.classList.replace('bg-neonemerald/20', 'bg-amber-500/20');
+                btn.classList.replace('text-emerald-300', 'text-amber-300');
+
+                timerInterval = setInterval(() => {
+                    if (timerSeconds > 0) {
+                        timerSeconds--;
+                        document.getElementById('timer-display').textContent = formatTime(timerSeconds);
+                    } else {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        confetti({ particleCount: 80, spread: 60 });
+                        addXP(25);
+                        showToast('زمان تمرکز تموم شد! +25 XP پاداش تمرکز گرفتی 🎉', '⏱️');
+                        resetTimer();
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            if (isTimerRunning) {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+            }
+            timerSeconds = selectedPresetMinutes * 60;
+            document.getElementById('timer-display').textContent = formatTime(timerSeconds);
+            document.getElementById('timer-btn-label').textContent = 'شروع تمرکز';
+            document.getElementById('timer-status-text').textContent = 'آماده شروع یک راند تمرکز بدون حواس‌پرتی';
+            
+            const btn = document.getElementById('timer-start-btn');
+            btn.classList.remove('bg-amber-500/20', 'text-amber-300');
+            btn.classList.add('bg-neonemerald/20', 'text-emerald-300');
+        }
+
+        // --- رویداد سوییچ حالت جمعه ---
+        document.getElementById('friday-toggle').addEventListener('change', (e) => {
+            state.isFridayMode = e.target.checked;
+            state.completedTasks = [];
+            saveState();
+            renderDashboard();
+            showToast(state.isFridayMode ? 'حالت جمعه فعال شد: مرور سبک و فوتبال! ⚽' : 'حالت عادی (شنبه تا پنج‌شنبه) فعال شد 📚', '🔄');
+        });
+
+        // --- راه‌اندازی اولیه صفحه ---
+        window.onload = () => {
+            loadState();
+            document.getElementById('friday-toggle').checked = state.isFridayMode;
+            renderPersianDate();
+            updateHeaderStats();
+            renderDashboard();
+            renderSideQuests();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
