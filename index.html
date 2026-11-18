@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
     <title>TOEFL Quest | داشبورد هوشمند و بازی‌وار تافل</title>
     <!-- فونت وزیرمتن برای خوانایی بی‌نقص فارسی -->
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
@@ -183,7 +185,7 @@
                         <span class="text-xs text-slate-400">پیشرفت امروز: <strong id="today-percent" class="text-white">0%</strong></span>
                     </div>
 
-                    <button id="complete-focus-btn" onclick="completeCurrentFocusTask()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neonviolet hover:bg-purple-500 active:scale-95 text-white font-bold text-sm transition shadow-lg shadow-neonviolet/25 cursor-pointer">
+                    <button id="complete-focus-btn" onclick="completeCurrentFocusTask(event)" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-neonviolet hover:bg-purple-500 active:scale-95 text-white font-bold text-sm transition shadow-lg shadow-neonviolet/25 cursor-pointer">
                         <i data-lucide="check-circle-2" class="w-4 h-4"></i>
                         <span>انجام شد! بگیر XP رو</span>
                     </button>
@@ -483,7 +485,7 @@
             completedTasks: [],
             sideQuestsCompletedCount: {},
             completedDaysCount: 1,
-            historyHeatmap: {} // ذخیره وضعیت ۱۸۰ روز
+            historyHeatmap: {}
         };
 
         function loadState() {
@@ -495,8 +497,7 @@
                     console.error('Error loading state', e);
                 }
             } else {
-                // تشخیص خودکار روز جمعه در بار اول
-                const today = new Date().getDay(); // 5 = Friday
+                const today = new Date().getDay();
                 if (today === 5) state.isFridayMode = true;
             }
         }
@@ -625,7 +626,6 @@
                 grid.appendChild(card);
             });
 
-            // آپدیت آمار امروز
             const total = tasks.length;
             const percent = Math.round((completedCount / total) * 100);
             document.getElementById('completed-tasks-badge').textContent = `${completedCount} از ${total} انجام شده`;
@@ -634,7 +634,6 @@
                 ? 'برنامه سبک جمعه (استراحت و فوتبال ⚽)' 
                 : 'چک‌لیست ماموریت‌های امروز';
 
-            // ذخیره پیشرفت روز جاری در هیت‌مپ
             state.historyHeatmap[state.completedDaysCount] = percent;
             saveState();
 
@@ -650,9 +649,7 @@
             const now = new Date();
             const currentHour = now.getHours() + now.getMinutes() / 60;
 
-            // اولویت با اولین تسک انجام‌نشده که زمانش رسیده یا پیش رو است
             let focusTask = tasks.find(t => !state.completedTasks.includes(t.id) && currentHour <= t.endHour);
-            // اگر نوبت زمانی گذشته بود، اولین تسک انجام‌نشده روز را نشان بده
             if (!focusTask) {
                 focusTask = tasks.find(t => !state.completedTasks.includes(t.id));
             }
@@ -701,7 +698,6 @@
                 state.completedTasks.push(taskId);
                 addXP(xp, event);
 
-                // اگر کل تسک‌های امروز تمام شد، جشن بگیر!
                 const tasks = getActiveTaskList();
                 if (state.completedTasks.length === tasks.length) {
                     confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
@@ -890,6 +886,11 @@
             renderSideQuests();
             lucide.createIcons();
         };
+
+        // ثبت Service Worker برای حالت آفلاین و PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
     </script>
 </body>
 </html>
